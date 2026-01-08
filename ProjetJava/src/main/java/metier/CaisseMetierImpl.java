@@ -10,10 +10,8 @@ import exception.CaisseException;
 public class CaisseMetierImpl implements ICaisseMetier {
     private GenericDao dao = new GenericDao();
 
-    @Override
-    public void alimenterCaisse(Reparateur r, float m, String desc) throws CaisseException {
-        gererMouvement(r, m, "ALIMENTATION", desc, null);
-    }
+    // @Override
+    // public void alimenterCaisse(Reparateur r, float m, String desc) throws CaisseException {gererMouvement(r, m, "ALIMENTATION", desc, null);}
 
     @Override
     public void retirerCaisse(Reparateur r, float m, String desc) throws CaisseException {
