@@ -8,6 +8,7 @@ dao\Client.class
 presentation\ClientPanelReparateur$1.class
 presentation\CaissePanelReparateur.class
 presentation\ReparationPanel$3.class
+presentation\AdminPanel$4.class
 presentation\CaissePanel$1.class
 metier\IClientMetier.class
 presentation\AdminPanel$1.class
@@ -26,6 +27,7 @@ dao\MouvementCaisse.class
 metier\IBoutiqueMetier.class
 dao\Recu.class
 exception\BoutiqueException.class
+presentation\AdminPanel$3.class
 presentation\CaissePanel.class
 presentation\ReparateurFrame$2.class
 presentation\ReparationPanel.class
@@ -39,6 +41,7 @@ dao\StatistiquesFinancieres.class
 dao\Reparation.class
 presentation\BoutiqueDialog.class
 presentation\ClientPanel$1.class
+presentation\CaissePanelReparateur$2.class
 metier\ICaisseMetier.class
 metier\ReparationMetierImpl.class
 presentation\DataSimulation.class
@@ -62,6 +65,7 @@ dao\GenericDao.class
 metier\IComposantMetier.class
 presentation\ReparationPanel$2.class
 metier\IReparationMetier.class
+presentation\AdminPanel$2.class
 presentation\ClientPanelReparateur$2.class
 presentation\ClientFrame.class
 presentation\ReparateurFrame.class
@@ -69,3 +73,4 @@ exception\CaisseException.class
 presentation\ReparationPanelReparateur.class
 presentation\ReparationPanelReparateur$2.class
 dao\Reparateur.class
+presentation\AdminPanel$5.class
