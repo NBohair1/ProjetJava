@@ -109,13 +109,10 @@ public class CaissePanelReparateur extends JPanel {
             StatistiquesCaisse stats = reparateurFrame.getCaisseMetier().obtenirStatistiques(reparateurFrame.getReparateur());
             
             if (stats != null) {
-                // Créer un tableau pour les statistiques
+                // Créer un tableau pour les statistiques - UNIQUEMENT LE SOLDE RÉEL
                 String[] colonnes = {"Indicateur", "Valeur"};
                 Object[][] donnees = {
-                    {" Solde actuel", String.format("%.2f DH", stats.getSoldeActuel())},
-                    {" Solde avec emprunts", String.format("%.2f DH", stats.getSoldeAvecEmprunts())},
-                    {" Total emprunts actifs", String.format("%.2f DH", stats.getTotalEmprunts())},
-                    {" Nombre emprunts actifs", String.valueOf(stats.getNombreEmpruntsActifs())},
+                    {" Solde réel de ma caisse", String.format("%.2f DH", stats.getSoldeActuel())},
                     {"", ""}, // Ligne vide pour séparer
                     {" Revenu total", String.format("%.2f DH", stats.getRevenuTotal())},
                     {" Revenus période (30j)", String.format("%.2f DH", stats.getRevenusPeriode())},
