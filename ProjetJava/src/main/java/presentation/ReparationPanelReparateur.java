@@ -63,9 +63,19 @@ public class ReparationPanelReparateur extends JPanel {
         btnNew.addActionListener(e -> nouvelleReparation());
         topPanel.add(btnNew);
         
+        JButton btnModifier = new JButton("Modifier");
+        btnModifier.addActionListener(e -> modifierReparation());
+        topPanel.add(btnModifier);
+        
         JButton btnChangeEtat = new JButton("Changer l'état");
         btnChangeEtat.addActionListener(e -> changerEtatReparation());
         topPanel.add(btnChangeEtat);
+        
+        JButton btnSupprimer = new JButton("Supprimer");
+        btnSupprimer.setBackground(new Color(231, 76, 60));
+        btnSupprimer.setForeground(Color.WHITE);
+        btnSupprimer.addActionListener(e -> supprimerReparation());
+        topPanel.add(btnSupprimer);
         
         JButton btnPDF = new JButton("Générer PDF Reçu");
         btnPDF.addActionListener(e -> genererPDFRecu());
@@ -431,15 +441,169 @@ public class ReparationPanelReparateur extends JPanel {
             Reparation r = reparateurFrame.getReparationMetier().rechercherParCodeSuivi(code);
             
             if (r != null) {
-                // Afficher un dialogue simple avec les détails
-                String details = "Code: " + r.getCodeSuivi() + "\n"
-                    + "Client: " + r.getClient().getNom() + " " + r.getClient().getPrenom() + "\n"
-                    + "État: " + r.getEtat() + "\n"
-                    + "Prix total: " + r.getPrixTotal() + " DH\n";
-                JOptionPane.showMessageDialog(this, details, "Détails Réparation", JOptionPane.INFORMATION_MESSAGE);
+                // Construire les détails complets
+                StringBuilder details = new StringBuilder();
+                details.append("=== DÉTAILS RÉPARATION ===\n\n");
+                details.append("Code suivi: ").append(r.getCodeSuivi()).append("\n");
+                details.append("État: ").append(r.getEtat()).append("\n\n");
+                
+                details.append("--- Client ---\n");
+                details.append("Nom: ").append(r.getClient().getNom()).append(" ").append(r.getClient().getPrenom()).append("\n");
+                details.append("Téléphone: ").append(r.getClient().getTelephone()).append("\n\n");
+                
+                details.append("--- Appareil(s) ---\n");
+                if (r.getAppareils() != null && !r.getAppareils().isEmpty()) {
+                    for (Appareil app : r.getAppareils()) {
+                        details.append("• ").append(app.getMarque()).append(" ").append(app.getModele())
+                               .append(" (").append(app.getTypeAppareil()).append(")\n");
+                        details.append("  IMEI: ").append(app.getImei()).append("\n");
+                    }
+                } else {
+                    details.append("Aucun appareil\n");
+                }
+                
+                details.append("\n--- Composants ---\n");
+                if (r.getComposants() != null && !r.getComposants().isEmpty()) {
+                    for (dao.Composant comp : r.getComposants()) {
+                        details.append("• ").append(comp.getNom()).append(" - ").append(comp.getPrix()).append(" DH\n");
+                    }
+                } else {
+                    details.append("Aucun composant\n");
+                }
+                
+                details.append("\n--- Informations ---\n");
+                details.append("Prix total: ").append(r.getPrixTotal()).append(" DH\n");
+                details.append("Date dépôt: ").append(r.getDateDepot() != null ? sdf.format(r.getDateDepot()) : "N/A").append("\n");
+                details.append("Date livraison: ").append(r.getDateLivraison() != null ? sdf.format(r.getDateLivraison()) : "N/A").append("\n");
+                
+                if (r.getCommentaire() != null && !r.getCommentaire().isEmpty()) {
+                    details.append("\nCommentaire:\n").append(r.getCommentaire()).append("\n");
+                }
+                
+                JTextArea textArea = new JTextArea(details.toString());
+                textArea.setEditable(false);
+                textArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+                JScrollPane scrollPane = new JScrollPane(textArea);
+                scrollPane.setPreferredSize(new Dimension(500, 400));
+                
+                JOptionPane.showMessageDialog(this, scrollPane, "Détails Réparation - " + code, JOptionPane.INFORMATION_MESSAGE);
             }
         } catch (ReparationException e) {
             JOptionPane.showMessageDialog(this, "Erreur: " + e.getMessage());
+        }
+    }
+    
+    private void modifierReparation() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow < 0) {
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner une réparation à modifier", "Aucune sélection", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        try {
+            String code = (String) model.getValueAt(selectedRow, 0);
+            Reparation r = reparateurFrame.getReparationMetier().rechercherParCodeSuivi(code);
+            
+            if (r == null) return;
+            
+            // Créer un panneau de modification
+            JPanel panelModif = new JPanel(new GridLayout(0, 2, 10, 10));
+            
+            JTextField txtPrix = new JTextField(String.valueOf(r.getPrixTotal()));
+            JTextArea txtCommentaire = new JTextArea(r.getCommentaire() != null ? r.getCommentaire() : "", 5, 20);
+            JScrollPane scrollComment = new JScrollPane(txtCommentaire);
+            
+            String[] etatsDisponibles = {"EN_ATTENTE", "EN_COURS", "TERMINEE", "LIVREE", "ANNULEE"};
+            JComboBox<String> cbEtat = new JComboBox<>(etatsDisponibles);
+            cbEtat.setSelectedItem(r.getEtat());
+            
+            panelModif.add(new JLabel("Prix total (DH):"));
+            panelModif.add(txtPrix);
+            panelModif.add(new JLabel("État:"));
+            panelModif.add(cbEtat);
+            panelModif.add(new JLabel("Commentaire:"));
+            panelModif.add(scrollComment);
+            
+            int option = JOptionPane.showConfirmDialog(this, panelModif, 
+                "Modifier Réparation - " + code, 
+                JOptionPane.OK_CANCEL_OPTION, 
+                JOptionPane.PLAIN_MESSAGE);
+            
+            if (option == JOptionPane.OK_OPTION) {
+                // Mettre à jour les champs modifiables
+                float nouveauPrix = Float.parseFloat(txtPrix.getText().trim());
+                String nouvelEtat = (String) cbEtat.getSelectedItem();
+                String nouveauCommentaire = txtCommentaire.getText().trim();
+                
+                r.setPrixTotal(nouveauPrix);
+                r.setEtat(nouvelEtat);
+                r.setCommentaire(nouveauCommentaire);
+                
+                reparateurFrame.getReparationMetier().modifierReparation(r);
+                
+                JOptionPane.showMessageDialog(this, 
+                    "Réparation modifiée avec succès!", 
+                    "Succès", 
+                    JOptionPane.INFORMATION_MESSAGE);
+                loadReparations();
+            }
+            
+        } catch (NumberFormatException e) {
+            JOptionPane.showMessageDialog(this, "Prix invalide", "Erreur", JOptionPane.ERROR_MESSAGE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Erreur: " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        }
+    }
+    
+    private void supprimerReparation() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow < 0) {
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner une réparation à supprimer", "Aucune sélection", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        try {
+            String code = (String) model.getValueAt(selectedRow, 0);
+            Reparation r = reparateurFrame.getReparationMetier().rechercherParCodeSuivi(code);
+            
+            if (r == null) {
+                JOptionPane.showMessageDialog(this, "Réparation non trouvée", "Erreur", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            
+            // Construire le message de confirmation en gérant les valeurs nulles
+            StringBuilder message = new StringBuilder("Voulez-vous vraiment supprimer cette réparation?\n\n");
+            message.append("Code: ").append(r.getCodeSuivi() != null ? r.getCodeSuivi() : "N/A").append("\n");
+            
+            if (r.getClient() != null) {
+                message.append("Client: ").append(r.getClient().getNom()).append(" ").append(r.getClient().getPrenom()).append("\n");
+            } else {
+                message.append("Client: Non spécifié\n");
+            }
+            
+            message.append("État: ").append(r.getEtat() != null ? r.getEtat() : "N/A").append("\n");
+            message.append("Prix: ").append(r.getPrixTotal()).append(" DH\n\n");
+            message.append("Cette action est irréversible!");
+            
+            int confirm = JOptionPane.showConfirmDialog(this, 
+                message.toString(),
+                "Confirmation de suppression",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.WARNING_MESSAGE);
+            
+            if (confirm == JOptionPane.YES_OPTION) {
+                reparateurFrame.getReparationMetier().supprimerReparation(r);
+                JOptionPane.showMessageDialog(this, 
+                    "Réparation supprimée avec succès!", 
+                    "Succès", 
+                    JOptionPane.INFORMATION_MESSAGE);
+                loadReparations();
+            }
+            
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Erreur: " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
         }
     }
     

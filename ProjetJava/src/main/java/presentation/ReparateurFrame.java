@@ -1,7 +1,10 @@
 package presentation;
 
+import dao.Caisse;
 import dao.Reparateur;
 import metier.*;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityTransaction;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
@@ -156,10 +159,18 @@ public class ReparateurFrame extends JFrame {
         
         JButton btnRefresh = new JButton("Actualiser");
         JButton btnNouveau = new JButton("Nouveau emprunt");
+        JButton btnModifier = new JButton("Modifier");
+        JButton btnSupprimer = new JButton("Supprimer");
+        btnSupprimer.setBackground(new Color(231, 76, 60));
+        btnSupprimer.setForeground(Color.WHITE);
         JButton btnRembourser = new JButton("Rembourser");
+        btnRembourser.setBackground(new Color(46, 204, 113));
+        btnRembourser.setForeground(Color.WHITE);
         
         topPanel.add(btnRefresh);
         topPanel.add(btnNouveau);
+        topPanel.add(btnModifier);
+        topPanel.add(btnSupprimer);
         topPanel.add(btnRembourser);
         
         panel.add(topPanel, BorderLayout.NORTH);
@@ -203,22 +214,36 @@ public class ReparateurFrame extends JFrame {
         btnNouveau.addActionListener(e -> {
             try {
                 JTextField txtMontant = new JTextField();
-                JComboBox<String> cbType = new JComboBox<>(new String[]{"AVANCE", "PRET", "AUTRE"});
+                JTextField txtCommentaire = new JTextField();
+                JComboBox<String> cbType = new JComboBox<>(new String[]{"SORTIE", "ENTREE"});
                 
-                Object[] message = {
-                    "Montant (DH):", txtMontant,
-                    "Type:", cbType
-                };
+                JPanel formPanel = new JPanel(new java.awt.GridLayout(0, 2, 10, 10));
+                formPanel.add(new JLabel("Montant (DH):"));
+                formPanel.add(txtMontant);
+                formPanel.add(new JLabel("Type:"));
+                formPanel.add(cbType);
+                formPanel.add(new JLabel("Commentaire:"));
+                formPanel.add(txtCommentaire);
+                formPanel.add(new JLabel(""), new JLabel(""));
+                formPanel.add(new JLabel("SORTIE = J'emprunte (argent entre)"));
+                formPanel.add(new JLabel(""), new JLabel(""));
+                formPanel.add(new JLabel("ENTREE = Je prête (argent sort)"));
                 
-                int option = JOptionPane.showConfirmDialog(panel, message, "Nouvel Emprunt", JOptionPane.OK_CANCEL_OPTION);
+                int option = JOptionPane.showConfirmDialog(this, formPanel, "Nouvel Emprunt", JOptionPane.OK_CANCEL_OPTION);
                 if (option == JOptionPane.OK_OPTION) {
                     float montant = Float.parseFloat(txtMontant.getText());
-                    empruntMetier.creerEmprunt(reparateur, montant, (String) cbType.getSelectedItem(), "");
-                    JOptionPane.showMessageDialog(panel, "Emprunt créé!");
+                    String type = (String) cbType.getSelectedItem();
+                    String commentaire = txtCommentaire.getText().trim();
+                    
+                    empruntMetier.creerEmprunt(reparateur, montant, type, commentaire.isEmpty() ? "Emprunt " + type : commentaire);
+                    JOptionPane.showMessageDialog(this, "Emprunt créé avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
                     loadData.run();
                 }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Montant invalide", "Erreur", JOptionPane.ERROR_MESSAGE);
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(panel, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
             }
         });
         
@@ -230,9 +255,9 @@ public class ReparateurFrame extends JFrame {
             }
             
             try {
-                int idEmprunt = (int) model.getValueAt(selectedRow, 0);
+                Long idEmprunt = (Long) model.getValueAt(selectedRow, 0);
                 java.util.List<dao.Emprunt> emprunts = empruntMetier.listerEmpruntsParReparateur(reparateur);
-                dao.Emprunt emp = emprunts.stream().filter(emprunt -> emprunt.getIdEmprunt() == idEmprunt).findFirst().orElse(null);
+                dao.Emprunt emp = emprunts.stream().filter(emprunt -> emprunt.getIdEmprunt().equals(idEmprunt)).findFirst().orElse(null);
                 
                 if (emp == null) {
                     JOptionPane.showMessageDialog(panel, "Emprunt introuvable");
@@ -258,8 +283,159 @@ public class ReparateurFrame extends JFrame {
                 JOptionPane.showMessageDialog(panel, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
             }
         });
+                btnModifier.addActionListener(e -> {
+            int selectedRow = table.getSelectedRow();
+            if (selectedRow < 0) {
+                JOptionPane.showMessageDialog(panel, "Veuillez sélectionner un emprunt à modifier", "Aucune sélection", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            
+            try {
+                Long idEmprunt = (Long) model.getValueAt(selectedRow, 0);
+                java.util.List<dao.Emprunt> emprunts = empruntMetier.listerEmpruntsParReparateur(reparateur);
+                dao.Emprunt emp = emprunts.stream().filter(emprunt -> emprunt.getIdEmprunt().equals(idEmprunt)).findFirst().orElse(null);
+                
+                if (emp == null) {
+                    JOptionPane.showMessageDialog(panel, "Emprunt introuvable", "Erreur", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                
+                if (emp.isRembourse()) {
+                    JOptionPane.showMessageDialog(panel, "Impossible de modifier un emprunt déjà remboursé", "Erreur", JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                
+                JTextField txtMontant = new JTextField(String.valueOf(emp.getMontant()));
+                JTextField txtCommentaire = new JTextField(emp.getCommentaire() != null ? emp.getCommentaire() : "");
+                JComboBox<String> cbType = new JComboBox<>(new String[]{"SORTIE", "ENTREE"});
+                cbType.setSelectedItem(emp.getType());
+                
+                JPanel modifPanel = new JPanel(new java.awt.GridLayout(0, 2, 10, 10));
+                modifPanel.add(new JLabel("Montant (DH):"));
+                modifPanel.add(txtMontant);
+                modifPanel.add(new JLabel("Type:"));
+                modifPanel.add(cbType);
+                modifPanel.add(new JLabel("Commentaire:"));
+                modifPanel.add(txtCommentaire);
+                
+                int option = JOptionPane.showConfirmDialog(this, modifPanel, "Modifier Emprunt", JOptionPane.OK_CANCEL_OPTION);
+                if (option == JOptionPane.OK_OPTION) {
+                    float nouveauMontant = Float.parseFloat(txtMontant.getText());
+                    String nouveauType = (String) cbType.getSelectedItem();
+                    String nouveauCommentaire = txtCommentaire.getText().trim();
+                    
+                    // Calculer la différence de montant pour ajuster la caisse
+                    float difference = nouveauMontant - emp.getMontant();
+                    
+                    emp.setMontant(nouveauMontant);
+                    emp.setType(nouveauType);
+                    emp.setCommentaire(nouveauCommentaire);
+                    
+                    // Mettre à jour l'emprunt
+                    EntityManager em = JPAUtil.getInstance().getEntityManager();
+                    EntityTransaction tx = em.getTransaction();
+                    try {
+                        tx.begin();
+                        em.merge(emp);
+                        
+                        // Ajuster le solde de la caisse selon la différence
+                        Caisse caisse = reparateur.getCaisse();
+                        if ("SORTIE".equalsIgnoreCase(nouveauType)) {
+                            caisse.setSoldeActuel(caisse.getSoldeActuel() + difference);
+                        } else if ("ENTREE".equalsIgnoreCase(nouveauType)) {
+                            caisse.setSoldeActuel(caisse.getSoldeActuel() - difference);
+                        }
+                        em.merge(caisse);
+                        
+                        tx.commit();
+                        JOptionPane.showMessageDialog(this, "Emprunt modifié avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                        loadData.run();
+                    } catch (Exception ex) {
+                        if (tx.isActive()) tx.rollback();
+                        throw ex;
+                    } finally {
+                        if (em != null && em.isOpen()) em.close();
+                    }
+                }
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "Montant invalide", "Erreur", JOptionPane.ERROR_MESSAGE);
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
+        });
         
-        loadData.run();
+        btnSupprimer.addActionListener(e -> {
+            int selectedRow = table.getSelectedRow();
+            if (selectedRow < 0) {
+                JOptionPane.showMessageDialog(panel, "Veuillez sélectionner un emprunt à supprimer", "Aucune sélection", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            
+            try {
+                Long idEmprunt = (Long) model.getValueAt(selectedRow, 0);
+                java.util.List<dao.Emprunt> emprunts = empruntMetier.listerEmpruntsParReparateur(reparateur);
+                dao.Emprunt emp = emprunts.stream().filter(emprunt -> emprunt.getIdEmprunt().equals(idEmprunt)).findFirst().orElse(null);
+                
+                if (emp == null) {
+                    JOptionPane.showMessageDialog(panel, "Emprunt introuvable", "Erreur", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                
+                String message = "Voulez-vous vraiment supprimer cet emprunt?\n\n" +
+                    "Montant: " + emp.getMontant() + " DH\n" +
+                    "Type: " + emp.getType() + "\n" +
+                    "État: " + (emp.isRembourse() ? "Remboursé" : "En cours") + "\n\n" +
+                    "⚠️ Cette action est irréversible!";
+                
+                int confirm = JOptionPane.showConfirmDialog(panel, 
+                    message,
+                    "Confirmation de suppression",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE);
+                
+                if (confirm == JOptionPane.YES_OPTION) {
+                    EntityManager em = JPAUtil.getInstance().getEntityManager();
+                    EntityTransaction tx = em.getTransaction();
+                    try {
+                        tx.begin();
+                        
+                        dao.Emprunt empManaged = em.find(dao.Emprunt.class, emp.getIdEmprunt());
+                        if (empManaged == null) {
+                            throw new Exception("Emprunt non trouvé");
+                        }
+                        
+                        // Ajuster le solde de la caisse avant suppression
+                        if (!empManaged.isRembourse()) {
+                            Caisse caisse = reparateur.getCaisse();
+                            if ("SORTIE".equalsIgnoreCase(empManaged.getType())) {
+                                // SORTIE = j'avais emprunté → retirer de la caisse
+                                caisse.setSoldeActuel(caisse.getSoldeActuel() - empManaged.getMontant());
+                            } else if ("ENTREE".equalsIgnoreCase(empManaged.getType())) {
+                                // ENTREE = j'avais prêté → remettre dans la caisse
+                                caisse.setSoldeActuel(caisse.getSoldeActuel() + empManaged.getMontant());
+                            }
+                            em.merge(caisse);
+                        }
+                        
+                        em.remove(empManaged);
+                        tx.commit();
+                        
+                        JOptionPane.showMessageDialog(panel, "Emprunt supprimé avec succès!", "Succès", JOptionPane.INFORMATION_MESSAGE);
+                        loadData.run();
+                    } catch (Exception ex) {
+                        if (tx.isActive()) tx.rollback();
+                        throw ex;
+                    } finally {
+                        if (em != null && em.isOpen()) em.close();
+                    }
+                }
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(panel, "Erreur: " + ex.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+                ex.printStackTrace();
+            }
+        });
+                loadData.run();
         return panel;
     }
 

@@ -15,7 +15,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
-import javax.swing.JTextArea;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 
@@ -110,30 +109,40 @@ public class CaissePanelReparateur extends JPanel {
             StatistiquesCaisse stats = reparateurFrame.getCaisseMetier().obtenirStatistiques(reparateurFrame.getReparateur());
             
             if (stats != null) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("=== STATISTIQUES DE MA CAISSE ===\n\n");
-                sb.append("💰 Solde actuel : ").append(String.format("%.2f DH", stats.getSoldeActuel())).append("\n");
-                sb.append("📊 Solde avec emprunts : ").append(String.format("%.2f DH", stats.getSoldeAvecEmprunts())).append("\n");
-                sb.append("💳 Total emprunts actifs : ").append(String.format("%.2f DH", stats.getTotalEmprunts())).append("\n");
-                sb.append("🔢 Nombre emprunts actifs : ").append(stats.getNombreEmpruntsActifs()).append("\n\n");
+                // Créer un tableau pour les statistiques
+                String[] colonnes = {"Indicateur", "Valeur"};
+                Object[][] donnees = {
+                    {" Solde actuel", String.format("%.2f DH", stats.getSoldeActuel())},
+                    {" Solde avec emprunts", String.format("%.2f DH", stats.getSoldeAvecEmprunts())},
+                    {" Total emprunts actifs", String.format("%.2f DH", stats.getTotalEmprunts())},
+                    {" Nombre emprunts actifs", String.valueOf(stats.getNombreEmpruntsActifs())},
+                    {"", ""}, // Ligne vide pour séparer
+                    {" Revenu total", String.format("%.2f DH", stats.getRevenuTotal())},
+                    {" Revenus période (30j)", String.format("%.2f DH", stats.getRevenusPeriode())},
+                    {" Réparations terminées", String.valueOf(stats.getNombreReparationsTerminees())},
+                    {" Total réparations", String.valueOf(stats.getNombreReparations())}
+                };
                 
-                sb.append("--- Réparations ---\n");
-                sb.append("📈 Revenu total : ").append(String.format("%.2f DH", stats.getRevenuTotal())).append("\n");
-                sb.append("✅ Réparations terminées : ").append(stats.getNombreReparationsTerminees()).append("\n");
-                sb.append("🔧 Total réparations : ").append(stats.getNombreReparations()).append("\n");
+                DefaultTableModel modelStats = new DefaultTableModel(donnees, colonnes) {
+                    @Override
+                    public boolean isCellEditable(int row, int column) {
+                        return false;
+                    }
+                };
                 
-                if (stats.getRevenusPeriode() > 0) {
-                    sb.append("\n📅 Revenus période : ").append(String.format("%.2f DH", stats.getRevenusPeriode()));
-                }
+                JTable tableStats = new JTable(modelStats);
+                tableStats.setFont(new Font("Segoe UI", Font.PLAIN, 13));
+                tableStats.setRowHeight(30);
+                tableStats.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
                 
-                JTextArea textArea = new JTextArea(sb.toString());
-                textArea.setEditable(false);
-                textArea.setFont(new Font("Monospaced", Font.PLAIN, 13));
+                // Ajuster la largeur des colonnes
+                tableStats.getColumnModel().getColumn(0).setPreferredWidth(250);
+                tableStats.getColumnModel().getColumn(1).setPreferredWidth(150);
                 
-                JScrollPane scrollPane = new JScrollPane(textArea);
+                JScrollPane scrollPane = new JScrollPane(tableStats);
                 scrollPane.setPreferredSize(new Dimension(450, 350));
                 
-                JOptionPane.showMessageDialog(this, scrollPane, "Statistiques Détaillées", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(this, scrollPane, "Statistiques Détaillées - Ma Caisse", JOptionPane.INFORMATION_MESSAGE);
             } else {
                 JOptionPane.showMessageDialog(this, "Aucune statistique disponible", "Info", JOptionPane.INFORMATION_MESSAGE);
             }

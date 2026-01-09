@@ -75,9 +75,30 @@ public class ReparationMetierImpl implements IReparationMetier {
     
     @Override
     public Reparation rechercherParCodeSuivi(String code) throws ReparationException {
-        Reparation r = dao.findOneByProperty(Reparation.class, "codeSuivi", code);
-        if(r == null) throw new ReparationException("Réparation introuvable");
-        return r;
+        if (code == null || code.trim().isEmpty()) {
+            throw new ReparationException("Code de suivi obligatoire");
+        }
+        
+        EntityManager em = dao.getEntityManager();
+        try {
+            List<Reparation> results = em.createQuery(
+                "SELECT DISTINCT r FROM Reparation r " +
+                "LEFT JOIN FETCH r.client " +
+                "LEFT JOIN FETCH r.reparateur " +
+                "LEFT JOIN FETCH r.appareils " +
+                "WHERE r.codeSuivi = :code", 
+                Reparation.class)
+                .setParameter("code", code)
+                .getResultList();
+            
+            if (results.isEmpty()) {
+                throw new ReparationException("Réparation introuvable avec le code: " + code);
+            }
+            
+            return results.get(0);
+        } finally {
+            em.close();
+        }
     }
 
     @Override
@@ -250,9 +271,16 @@ public class ReparationMetierImpl implements IReparationMetier {
     @Override
     public String genererRecuPDF(Recu recu, String cheminSortie) throws ReparationException {
         try {
+            // cheminSortie est déjà le chemin complet du fichier (ex: C:/chemin/fichier.pdf)
             Document document = new Document(PageSize.A4);
-            String nomFichier = cheminSortie + "/" + recu.getNumeroRecu() + ".pdf";
-            PdfWriter.getInstance(document, new FileOutputStream(nomFichier));
+            
+            // Créer les répertoires parents si nécessaires
+            java.io.File fichier = new java.io.File(cheminSortie);
+            if (fichier.getParentFile() != null && !fichier.getParentFile().exists()) {
+                fichier.getParentFile().mkdirs();
+            }
+            
+            PdfWriter.getInstance(document, new FileOutputStream(cheminSortie));
             
             document.open();
             
@@ -376,7 +404,7 @@ public class ReparationMetierImpl implements IReparationMetier {
             
             document.close();
             
-            return nomFichier;
+            return cheminSortie;
             
         } catch (Exception e) {
             throw new ReparationException("Erreur génération PDF: " + e.getMessage());
@@ -414,6 +442,87 @@ public class ReparationMetierImpl implements IReparationMetier {
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             throw new ReparationException("Erreur: " + e.getMessage());
+        } finally {
+            em.close();
+        }
+    }
+    
+    @Override
+    public void modifierReparation(Reparation reparation) throws ReparationException {
+        if (reparation == null) {
+            throw new ReparationException("Réparation invalide");
+        }
+        
+        EntityManager em = dao.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+            
+            Reparation reparationManaged = em.find(Reparation.class, reparation.getIdReparation());
+            if (reparationManaged == null) {
+                throw new ReparationException("Réparation non trouvée");
+            }
+            
+            // Mettre à jour les champs modifiables
+            reparationManaged.setPrixTotal(reparation.getPrixTotal());
+            reparationManaged.setEtat(reparation.getEtat());
+            reparationManaged.setCommentaire(reparation.getCommentaire());
+            
+            // Si l'état passe à LIVREE, on met la date de livraison
+            if ("LIVREE".equals(reparation.getEtat()) && reparationManaged.getDateLivraison() == null) {
+                reparationManaged.setDateLivraison(new Date());
+            }
+            
+            em.merge(reparationManaged);
+            tx.commit();
+            
+        } catch (Exception e) {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+            throw new ReparationException("Erreur lors de la modification: " + e.getMessage());
+        } finally {
+            em.close();
+        }
+    }
+    
+    @Override
+    public void supprimerReparation(Reparation reparation) throws ReparationException {
+        if (reparation == null) {
+            throw new ReparationException("Réparation invalide");
+        }
+        
+        EntityManager em = dao.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+            
+            Reparation reparationManaged = em.find(Reparation.class, reparation.getIdReparation());
+            if (reparationManaged == null) {
+                throw new ReparationException("Réparation non trouvée");
+            }
+            
+            // Supprimer les appareils associés
+            if (reparationManaged.getAppareils() != null) {
+                for (Appareil app : reparationManaged.getAppareils()) {
+                    em.remove(em.merge(app));
+                }
+            }
+            
+            // Supprimer les reçus associés
+            if (reparationManaged.getRecu() != null) {
+                em.remove(em.merge(reparationManaged.getRecu()));
+            }
+            
+            // Supprimer la réparation
+            em.remove(reparationManaged);
+            tx.commit();
+            
+        } catch (Exception e) {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+            throw new ReparationException("Erreur lors de la suppression: " + e.getMessage());
         } finally {
             em.close();
         }

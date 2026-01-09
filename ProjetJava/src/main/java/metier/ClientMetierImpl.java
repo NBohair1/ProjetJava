@@ -133,15 +133,43 @@ public class ClientMetierImpl implements IClientMetier {
             if (client == null)
                 throw new ClientException("Client obligatoire");
 
-            // Vérifier si le client a des réparations en cours
-            List<Reparation> reparations = dao.findByProperty(Reparation.class, "client", client);
-            for (Reparation r : reparations) {
-                if (!"TERMINEE".equalsIgnoreCase(r.getEtat()) && !"LIVREE".equalsIgnoreCase(r.getEtat())) {
-                    throw new ClientException("Impossible de supprimer: le client a des réparations en cours");
-                }
+            // Récupérer le client géré par JPA
+            Client clientManaged = em.find(Client.class, client.getIdClient());
+            if (clientManaged == null) {
+                throw new ClientException("Client non trouvé");
             }
 
-            dao.delete(client);
+            // Vérifier si le client a des réparations
+            List<Reparation> reparations = em.createQuery(
+                "SELECT r FROM Reparation r WHERE r.client.idClient = :clientId", Reparation.class)
+                .setParameter("clientId", client.getIdClient())
+                .getResultList();
+            
+            if (!reparations.isEmpty()) {
+                // Vérifier si toutes les réparations sont terminées ou livrées
+                boolean hasActiveRepairs = false;
+                for (Reparation r : reparations) {
+                    if (!"TERMINEE".equalsIgnoreCase(r.getEtat()) && 
+                        !"LIVREE".equalsIgnoreCase(r.getEtat()) &&
+                        !"ANNULEE".equalsIgnoreCase(r.getEtat())) {
+                        hasActiveRepairs = true;
+                        break;
+                    }
+                }
+                
+                if (hasActiveRepairs) {
+                    throw new ClientException("Impossible de supprimer: le client a des réparations actives (EN_ATTENTE ou EN_COURS).\n" +
+                        "Veuillez d'abord terminer, livrer ou annuler toutes ses réparations.");
+                }
+                
+                // Message informatif si le client a des réparations terminées
+                throw new ClientException("Impossible de supprimer: le client a un historique de " + 
+                    reparations.size() + " réparation(s).\n" +
+                    "La suppression est bloquée pour conserver l'historique.");
+            }
+
+            // Supprimer le client s'il n'a aucune réparation
+            em.remove(clientManaged);
             
             tx.commit();
         } catch (ClientException e) {
@@ -149,7 +177,7 @@ public class ClientMetierImpl implements IClientMetier {
             throw e;
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
-            throw new ClientException("Erreur suppression client", e);
+            throw new ClientException("Erreur lors de la suppression: " + e.getMessage(), e);
         } finally {
             if (em != null && em.isOpen()) {
                 em.close();

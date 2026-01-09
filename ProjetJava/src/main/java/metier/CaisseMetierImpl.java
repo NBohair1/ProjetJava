@@ -132,13 +132,13 @@ public class CaisseMetierImpl implements ICaisseMetier {
         // Revenu total
         EntityManager em = dao.getEntityManager();
         try {
-            Float revenuTotal = em.createQuery(
+            Double revenuTotal = em.createQuery(
                 "SELECT SUM(m.montant) FROM MouvementCaisse m " +
                 "WHERE m.caisse.idCaisse = :caisseId AND m.typeMouvement = 'ENTREE'",
-                Float.class)
+                Double.class)
                 .setParameter("caisseId", r.getCaisse().getIdCaisse())
                 .getSingleResult();
-            stats.setRevenuTotal(revenuTotal != null ? revenuTotal : 0);
+            stats.setRevenuTotal(revenuTotal != null ? revenuTotal.floatValue() : 0);
         } finally {
             em.close();
         }
@@ -174,17 +174,17 @@ public class CaisseMetierImpl implements ICaisseMetier {
         
         EntityManager em = dao.getEntityManager();
         try {
-            Float revenus = em.createQuery(
+            Double revenus = em.createQuery(
                 "SELECT SUM(m.montant) FROM MouvementCaisse m " +
                 "WHERE m.caisse.idCaisse = :caisseId " +
                 "AND m.typeMouvement = 'ENTREE' " +
                 "AND m.dateMouvement BETWEEN :debut AND :fin",
-                Float.class)
+                Double.class)
                 .setParameter("caisseId", r.getCaisse().getIdCaisse())
                 .setParameter("debut", dateDebut)
                 .setParameter("fin", dateFin)
                 .getSingleResult();
-            return revenus != null ? revenus : 0;
+            return revenus != null ? revenus.floatValue() : 0;
         } finally {
             em.close();
         }

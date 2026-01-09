@@ -58,6 +58,12 @@ public interface IReparationMetier {
     // Annuler une réparation
     void annulerReparation(Reparation reparation) throws ReparationException;
     
+    // Modifier une réparation existante
+    void modifierReparation(Reparation reparation) throws ReparationException;
+    
+    // Supprimer une réparation
+    void supprimerReparation(Reparation reparation) throws ReparationException;
+    
     // Supprimer un appareil d'une réparation
     void supprimerAppareil(Reparation reparation, Appareil appareil) throws ReparationException;
     
