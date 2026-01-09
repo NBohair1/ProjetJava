@@ -10,6 +10,8 @@ c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\dao\Proprietair
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\dao\Recu.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\dao\Reparateur.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\dao\Reparation.java
+c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\dao\StatistiquesCaisse.java
+c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\dao\StatistiquesFinancieres.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\dao\User.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\exception\AuthException.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\exception\BoutiqueException.java
@@ -37,6 +39,7 @@ c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\presentation\Ad
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\presentation\BoutiqueDialog.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\presentation\CaissePanel.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\presentation\CaissePanelReparateur.java
+c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\presentation\ClientFrame.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\presentation\ClientPanel.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\presentation\ClientPanelReparateur.java
 c:\Users\DELL 13TH\Downloads\ProjetJava\ProjetJava\src\main\java\presentation\ComposantPanelReparateur.java

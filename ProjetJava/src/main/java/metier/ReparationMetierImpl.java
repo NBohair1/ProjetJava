@@ -1,10 +1,25 @@
 package metier;
 
+import java.io.FileOutputStream;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 
 import javax.persistence.EntityManager;
 import javax.persistence.EntityTransaction;
+
+import com.itextpdf.text.BaseColor;
+import com.itextpdf.text.Document;
+import com.itextpdf.text.Element;
+import com.itextpdf.text.Font;
+import com.itextpdf.text.FontFactory;
+import com.itextpdf.text.PageSize;
+import com.itextpdf.text.Paragraph;
+import com.itextpdf.text.Phrase;
+import com.itextpdf.text.Rectangle;
+import com.itextpdf.text.pdf.PdfPCell;
+import com.itextpdf.text.pdf.PdfPTable;
+import com.itextpdf.text.pdf.PdfWriter;
 
 import dao.Appareil;
 import dao.Client;
@@ -18,8 +33,8 @@ import exception.ReparationException;
 
 public class ReparationMetierImpl implements IReparationMetier {
     
-    private GenericDao dao = new GenericDao();
-    private ICaisseMetier caisseMetier = new CaisseMetierImpl();
+    private final GenericDao dao = new GenericDao();
+    private final ICaisseMetier caisseMetier = new CaisseMetierImpl();
     
     @Override
     public Reparation creerReparation(Client client, Reparateur reparateur) throws ReparationException {
@@ -201,8 +216,178 @@ public class ReparationMetierImpl implements IReparationMetier {
     }
     
     @Override
-    public Recu genererRecu(Reparation r, float m) throws ReparationException { 
-        return null; 
+    public Recu genererRecu(Reparation r, float m) throws ReparationException {
+        EntityManager em = dao.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+            
+            Reparation reparationManaged = em.find(Reparation.class, r.getIdReparation());
+            
+            Recu recu = new Recu();
+            recu.setNumeroRecu("REC-" + System.currentTimeMillis());
+            recu.setMontant(m);
+            recu.setModePaiement("CASH");
+            recu.setDate(new Date());
+            recu.setReparation(reparationManaged);
+            recu.setClient(reparationManaged.getClient());
+            
+            em.persist(recu);
+            
+            reparationManaged.setRecu(recu);
+            em.merge(reparationManaged);
+            
+            tx.commit();
+            return recu;
+        } catch (Exception e) {
+            if (tx.isActive()) tx.rollback();
+            throw new ReparationException("Erreur génération reçu: " + e.getMessage());
+        } finally {
+            em.close();
+        }
+    }
+    
+    @Override
+    public String genererRecuPDF(Recu recu, String cheminSortie) throws ReparationException {
+        try {
+            Document document = new Document(PageSize.A4);
+            String nomFichier = cheminSortie + "/" + recu.getNumeroRecu() + ".pdf";
+            PdfWriter.getInstance(document, new FileOutputStream(nomFichier));
+            
+            document.open();
+            
+            // En-tête
+            Font fontTitle = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, BaseColor.DARK_GRAY);
+            Font fontSubtitle = FontFactory.getFont(FontFactory.HELVETICA, 12, BaseColor.GRAY);
+            Font fontBold = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11);
+            Font fontNormal = FontFactory.getFont(FontFactory.HELVETICA, 10);
+            
+            Paragraph title = new Paragraph("REÇU DE PAIEMENT", fontTitle);
+            title.setAlignment(Element.ALIGN_CENTER);
+            title.setSpacingAfter(10);
+            document.add(title);
+            
+            // Informations Boutique
+            Reparation rep = recu.getReparation();
+            if (rep != null && rep.getReparateur() != null && rep.getReparateur().getBoutique() != null) {
+                Paragraph boutique = new Paragraph(rep.getReparateur().getBoutique().getNom(), fontBold);
+                boutique.setAlignment(Element.ALIGN_CENTER);
+                document.add(boutique);
+                
+                Paragraph adresse = new Paragraph(
+                    rep.getReparateur().getBoutique().getAdresse() + " - " + 
+                    rep.getReparateur().getBoutique().getNumTelephone(), fontNormal);
+                adresse.setAlignment(Element.ALIGN_CENTER);
+                adresse.setSpacingAfter(20);
+                document.add(adresse);
+            }
+            
+            document.add(new Paragraph(" "));
+            
+            // Informations Reçu
+            PdfPTable tableInfo = new PdfPTable(2);
+            tableInfo.setWidthPercentage(100);
+            tableInfo.setSpacingBefore(10);
+            tableInfo.setSpacingAfter(10);
+            
+            addCell(tableInfo, "N° Reçu:", fontBold);
+            addCell(tableInfo, recu.getNumeroRecu(), fontNormal);
+            
+            SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm");
+            addCell(tableInfo, "Date:", fontBold);
+            addCell(tableInfo, sdf.format(recu.getDate()), fontNormal);
+            
+            if (rep != null) {
+                addCell(tableInfo, "Code Suivi:", fontBold);
+                addCell(tableInfo, rep.getCodeSuivi() != null ? rep.getCodeSuivi() : "N/A", fontNormal);
+            }
+            
+            document.add(tableInfo);
+            
+            // Informations Client
+            document.add(new Paragraph("INFORMATIONS CLIENT", fontBold));
+            document.add(new Paragraph(" "));
+            
+            PdfPTable tableClient = new PdfPTable(2);
+            tableClient.setWidthPercentage(100);
+            
+            Client client = recu.getClient();
+            if (client != null) {
+                addCell(tableClient, "Nom:", fontBold);
+                addCell(tableClient, client.getNom() + " " + client.getPrenom(), fontNormal);
+                
+                addCell(tableClient, "Téléphone:", fontBold);
+                addCell(tableClient, client.getTelephone() != null ? client.getTelephone() : "N/A", fontNormal);
+            }
+            
+            document.add(tableClient);
+            document.add(new Paragraph(" "));
+            
+            // Détails Réparation
+            if (rep != null) {
+                document.add(new Paragraph("DÉTAILS RÉPARATION", fontBold));
+                document.add(new Paragraph(" "));
+                
+                PdfPTable tableRep = new PdfPTable(2);
+                tableRep.setWidthPercentage(100);
+                
+                addCell(tableRep, "Prix Total:", fontBold);
+                addCell(tableRep, String.format("%.2f DH", rep.getPrixTotal()), fontNormal);
+                
+                addCell(tableRep, "État:", fontBold);
+                addCell(tableRep, rep.getEtat(), fontNormal);
+                
+                if (rep.getCommentaire() != null && !rep.getCommentaire().isEmpty()) {
+                    addCell(tableRep, "Commentaire:", fontBold);
+                    addCell(tableRep, rep.getCommentaire(), fontNormal);
+                }
+                
+                document.add(tableRep);
+            }
+            
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph(" "));
+            
+            // Montant payé
+            PdfPTable tableMontant = new PdfPTable(2);
+            tableMontant.setWidthPercentage(100);
+            tableMontant.setSpacingBefore(20);
+            
+            PdfPCell cellLabel = new PdfPCell(new Phrase("MONTANT PAYÉ:", fontTitle));
+            cellLabel.setBorder(Rectangle.NO_BORDER);
+            cellLabel.setHorizontalAlignment(Element.ALIGN_RIGHT);
+            cellLabel.setPadding(5);
+            tableMontant.addCell(cellLabel);
+            
+            PdfPCell cellMontant = new PdfPCell(new Phrase(String.format("%.2f DH", recu.getMontant()), fontTitle));
+            cellMontant.setBorder(Rectangle.NO_BORDER);
+            cellMontant.setHorizontalAlignment(Element.ALIGN_LEFT);
+            cellMontant.setPadding(5);
+            tableMontant.addCell(cellMontant);
+            
+            document.add(tableMontant);
+            
+            // Pied de page
+            document.add(new Paragraph(" "));
+            document.add(new Paragraph(" "));
+            Paragraph footer = new Paragraph("Merci pour votre confiance!", fontSubtitle);
+            footer.setAlignment(Element.ALIGN_CENTER);
+            document.add(footer);
+            
+            document.close();
+            
+            return nomFichier;
+            
+        } catch (Exception e) {
+            throw new ReparationException("Erreur génération PDF: " + e.getMessage());
+        }
+    }
+    
+    private void addCell(PdfPTable table, String text, Font font) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        cell.setBorder(Rectangle.NO_BORDER);
+        cell.setPadding(5);
+        table.addCell(cell);
     }
     
     @Override

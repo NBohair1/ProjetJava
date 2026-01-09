@@ -49,6 +49,9 @@ public interface IReparationMetier {
     // Générer le reçu de paiement (CASH uniquement)
     Recu genererRecu(Reparation reparation, float montantPaye) throws ReparationException;
     
+    // Générer le PDF du reçu
+    String genererRecuPDF(Recu recu, String cheminSortie) throws ReparationException;
+    
     // Rechercher une réparation par son code de suivi
     Reparation rechercherParCodeSuivi(String codeSuivi) throws ReparationException;
     

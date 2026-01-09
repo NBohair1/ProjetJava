@@ -1,17 +1,35 @@
 package presentation;
 
-import java.awt.*;
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridLayout;
 import java.text.SimpleDateFormat;
 import java.util.List;
-import javax.swing.*;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
+import javax.swing.JFileChooser;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
-import dao.Reparation;
-import dao.Client;
+
 import dao.Appareil;
+import dao.Client;
+import dao.Reparation;
 import exception.ReparationException;
-import exception.ClientException;
 
 public class ReparationPanelReparateur extends JPanel {
 
@@ -48,6 +66,10 @@ public class ReparationPanelReparateur extends JPanel {
         JButton btnChangeEtat = new JButton("Changer l'état");
         btnChangeEtat.addActionListener(e -> changerEtatReparation());
         topPanel.add(btnChangeEtat);
+        
+        JButton btnPDF = new JButton("Générer PDF Reçu");
+        btnPDF.addActionListener(e -> genererPDFRecu());
+        topPanel.add(btnPDF);
 
         JButton btnRefresh = new JButton("Actualiser");
         btnRefresh.addActionListener(e -> loadReparations());
@@ -418,6 +440,47 @@ public class ReparationPanelReparateur extends JPanel {
             }
         } catch (ReparationException e) {
             JOptionPane.showMessageDialog(this, "Erreur: " + e.getMessage());
+        }
+    }
+    
+    private void genererPDFRecu() {
+        int selectedRow = table.getSelectedRow();
+        if (selectedRow < 0) {
+            JOptionPane.showMessageDialog(this, "Veuillez sélectionner une réparation", "Aucune sélection", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        
+        try {
+            String code = (String) model.getValueAt(selectedRow, 0);
+            Reparation r = reparateurFrame.getReparationMetier().rechercherParCodeSuivi(code);
+            
+            if (r != null) {
+                // Choix du répertoire de sauvegarde
+                JFileChooser fileChooser = new JFileChooser();
+                fileChooser.setDialogTitle("Enregistrer le reçu PDF");
+                fileChooser.setSelectedFile(new java.io.File("Recu_" + code + ".pdf"));
+                
+                int userSelection = fileChooser.showSaveDialog(this);
+                
+                if (userSelection == JFileChooser.APPROVE_OPTION) {
+                    String chemin = fileChooser.getSelectedFile().getAbsolutePath();
+                    if (!chemin.toLowerCase().endsWith(".pdf")) {
+                        chemin += ".pdf";
+                    }
+                    
+                    // Créer un reçu à partir de la réparation
+                    dao.Recu recu = reparateurFrame.getReparationMetier().genererRecu(r, r.getPrixTotal());
+                    reparateurFrame.getReparationMetier().genererRecuPDF(recu, chemin);
+                    
+                    JOptionPane.showMessageDialog(this,
+                        "Reçu PDF généré avec succès!\n\nChemin: " + chemin,
+                        "Succès",
+                        JOptionPane.INFORMATION_MESSAGE);
+                }
+            }
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Erreur lors de la génération du PDF: " + e.getMessage(), "Erreur", JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
         }
     }
 }

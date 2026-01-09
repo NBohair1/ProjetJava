@@ -1,5 +1,6 @@
 package metier;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
@@ -11,11 +12,13 @@ import dao.Caisse;
 import dao.GenericDao;
 import dao.Proprietaire;
 import dao.Reparateur;
+import dao.Reparation;
+import dao.StatistiquesFinancieres;
 import exception.BoutiqueException;
 
 public class BoutiqueMetierImpl implements IBoutiqueMetier {
 
-    private GenericDao dao = new GenericDao();
+    private final GenericDao dao = new GenericDao();
 
     @Override
     public Reparateur creerReparateur(
@@ -211,6 +214,144 @@ public class BoutiqueMetierImpl implements IBoutiqueMetier {
         } catch (Exception e) {
             if (tx.isActive()) tx.rollback();
             throw new BoutiqueException("Erreur modification pourcentage", e);
+        } finally {
+            if (em != null && em.isOpen()) {
+                em.close();
+            }
+        }
+    }
+    
+    @Override
+    public List<Reparation> listerDernieresReparations(Proprietaire proprietaire, int limite) 
+            throws BoutiqueException {
+        if (proprietaire == null)
+            throw new BoutiqueException("Propriétaire obligatoire");
+        
+        EntityManager em = JPAUtil.getInstance().getEntityManager();
+        try {
+            // Récupérer toutes les boutiques du propriétaire
+            List<Boutique> boutiques = listerBoutiques(proprietaire);
+            if (boutiques == null || boutiques.isEmpty())
+                return new ArrayList<>();
+            
+            // Récupérer les dernières réparations de toutes les boutiques
+            return em.createQuery(
+                "SELECT DISTINCT r FROM Reparation r " +
+                "LEFT JOIN FETCH r.client " +
+                "LEFT JOIN FETCH r.reparateur rep " +
+                "LEFT JOIN FETCH r.appareils " +
+                "WHERE rep.boutique IN :boutiques " +
+                "ORDER BY r.dateDepot DESC",
+                Reparation.class)
+                .setParameter("boutiques", boutiques)
+                .setMaxResults(limite)
+                .getResultList();
+        } finally {
+            if (em != null && em.isOpen()) {
+                em.close();
+            }
+        }
+    }
+    
+    @Override
+    public StatistiquesFinancieres obtenirStatistiquesFinancieres(Proprietaire proprietaire) 
+            throws BoutiqueException {
+        if (proprietaire == null)
+            throw new BoutiqueException("Propriétaire obligatoire");
+        
+        EntityManager em = JPAUtil.getInstance().getEntityManager();
+        try {
+            StatistiquesFinancieres stats = new StatistiquesFinancieres();
+            
+            // Récupérer toutes les boutiques du propriétaire
+            List<Boutique> boutiques = listerBoutiques(proprietaire);
+            if (boutiques == null || boutiques.isEmpty())
+                return stats;
+            
+            // Récupérer tous les réparateurs de ces boutiques
+            List<Reparateur> reparateurs = em.createQuery(
+                "SELECT r FROM Reparateur r WHERE r.boutique IN :boutiques",
+                Reparateur.class)
+                .setParameter("boutiques", boutiques)
+                .getResultList();
+            
+            stats.setNombreReparateursActifs(reparateurs.size());
+            
+            float revenuTotal = 0;
+            float totalCaisses = 0;
+            int nombreTotalReparations = 0;
+            
+            // Calculer les statistiques pour chaque réparateur
+            for (Reparateur rep : reparateurs) {
+                if (rep.getCaisse() == null) continue;
+                
+                // Solde de la caisse
+                float soldeCaisse = rep.getCaisse().getSoldeActuel();
+                totalCaisses += soldeCaisse;
+                
+                // Revenus générés par ce réparateur
+                Float revenus = em.createQuery(
+                    "SELECT SUM(m.montant) FROM MouvementCaisse m " +
+                    "WHERE m.caisse.idCaisse = :caisseId AND m.typeMouvement = 'ENTREE'",
+                    Float.class)
+                    .setParameter("caisseId", rep.getCaisse().getIdCaisse())
+                    .getSingleResult();
+                
+                float revenusRep = (revenus != null ? revenus : 0);
+                revenuTotal += revenusRep;
+                
+                // Nombre de réparations
+                Long nbRep = em.createQuery(
+                    "SELECT COUNT(r) FROM Reparation r WHERE r.reparateur.id = :repId",
+                    Long.class)
+                    .setParameter("repId", rep.getId())
+                    .getSingleResult();
+                
+                int nombreRep = (nbRep != null ? nbRep.intValue() : 0);
+                nombreTotalReparations += nombreRep;
+                
+                // Calculer le pourcentage gagné par le réparateur
+                float pourcentageGagne = revenusRep * (rep.getPourcentageGain() / 100);
+                
+                // Ajouter aux statistiques
+                stats.ajouterRevenusReparateur(rep.getId(), revenusRep);
+                stats.ajouterPourcentageReparateur(rep.getId(), pourcentageGagne);
+                stats.ajouterNombreReparationsReparateur(rep.getId(), nombreRep);
+            }
+            
+            stats.setRevenuTotalBoutique(revenuTotal);
+            stats.setTotalCaissesBoutique(totalCaisses);
+            stats.setNombreTotalReparations(nombreTotalReparations);
+            
+            return stats;
+        } finally {
+            if (em != null && em.isOpen()) {
+                em.close();
+            }
+        }
+    }
+    
+    @Override
+    public List<Caisse> listerCaissesReparateurs(Proprietaire proprietaire) 
+            throws BoutiqueException {
+        if (proprietaire == null)
+            throw new BoutiqueException("Propriétaire obligatoire");
+        
+        EntityManager em = JPAUtil.getInstance().getEntityManager();
+        try {
+            // Récupérer toutes les boutiques du propriétaire
+            List<Boutique> boutiques = listerBoutiques(proprietaire);
+            if (boutiques == null || boutiques.isEmpty())
+                return new ArrayList<>();
+            
+            // Récupérer toutes les caisses des réparateurs
+            return em.createQuery(
+                "SELECT c FROM Caisse c " +
+                "JOIN Reparateur r ON r.caisse.idCaisse = c.idCaisse " +
+                "WHERE r.boutique IN :boutiques",
+                Caisse.class)
+                .setParameter("boutiques", boutiques)
+                .getResultList();
         } finally {
             if (em != null && em.isOpen()) {
                 em.close();

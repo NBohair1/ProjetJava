@@ -6,6 +6,8 @@ import dao.Boutique;
 import dao.Caisse;
 import dao.Proprietaire;
 import dao.Reparateur;
+import dao.Reparation;
+import dao.StatistiquesFinancieres;
 import exception.BoutiqueException;
 
 public interface IBoutiqueMetier {
@@ -40,4 +42,9 @@ public interface IBoutiqueMetier {
     
     // Modifier le pourcentage de gain d'un réparateur
     void modifierPourcentageGain(Reparateur reparateur, float nouveauPourcentage) throws BoutiqueException;
+    
+    // Nouvelles méthodes pour le propriétaire
+    List<Reparation> listerDernieresReparations(Proprietaire proprietaire, int limite) throws BoutiqueException;
+    StatistiquesFinancieres obtenirStatistiquesFinancieres(Proprietaire proprietaire) throws BoutiqueException;
+    List<Caisse> listerCaissesReparateurs(Proprietaire proprietaire) throws BoutiqueException;
 }

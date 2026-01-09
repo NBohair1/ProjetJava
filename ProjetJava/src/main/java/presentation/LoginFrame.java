@@ -17,6 +17,7 @@ public class LoginFrame extends JFrame {
     private JTextField txtEmail;
     private JPasswordField txtPassword;
     private JButton btnLogin;
+    private JButton btnClient;
     private final IAuthMetier authMetier;
     private final IBoutiqueMetier boutiqueMetier;
 
@@ -29,7 +30,7 @@ public class LoginFrame extends JFrame {
     private void initComponents() {
         setTitle("Connexion");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setSize(400, 300);
+        setSize(400, 350);
         setLocationRelativeTo(null);
 
         JPanel mainPanel = new JPanel();
@@ -58,12 +59,26 @@ public class LoginFrame extends JFrame {
         
         btnPanel.add(btnLogin);
         mainPanel.add(btnPanel);
+        
+        // Bouton "Je suis un client"
+        btnClient = new JButton("Je suis un client");
+        btnClient.setBounds(100, 220, 200, 35);
+        btnClient.setFont(new Font("Tahoma", Font.PLAIN, 12));
+        btnClient.setBackground(new Color(0, 153, 204));
+        btnClient.setForeground(Color.WHITE);
+        mainPanel.add(btnClient);
+        
+        // Séparateur
+        JSeparator separator = new JSeparator();
+        separator.setBounds(50, 205, 300, 2);
+        mainPanel.add(separator);
 
         getContentPane().add(mainPanel);
 
         // Actions
         btnLogin.addActionListener(e -> login());
         txtPassword.addActionListener(e -> login());
+        btnClient.addActionListener(e -> ouvrirInterfaceClient());
     }
 
     // --- Logique Métier ---
@@ -109,10 +124,10 @@ public class LoginFrame extends JFrame {
                 JOptionPane.ERROR_MESSAGE);
         }
     }
-
-    private void showInscriptionDialog() {
-        // Ta logique d'inscription (simplifiée ici pour l'exemple)
-        JOptionPane.showMessageDialog(this, "Fonctionnalité d'inscription à implémenter ici (copier ton code précédent)");
+    
+    private void ouvrirInterfaceClient() {
+        new ClientFrame().setVisible(true);
+        this.dispose();
     }
 
     public static void main(String[] args) {
